@@ -5,7 +5,7 @@ const Chat = require("../models/chatModel");
 const { response } = require("express");
 
 //@description     Get all Messages
-//@route           GET /api/Message/:chatId
+//@route           GET /api/message/:chatId
 //@access          Protected
 const allMessages = asyncHandler(async (req, res) => {
   try {
@@ -23,7 +23,7 @@ const allMessages = asyncHandler(async (req, res) => {
 
 
 //@description     Create New Message
-//@route           POST /api/Message/
+//@route           POST /api/message/
 //@access          Protected
 const sendMessage = asyncHandler(async (req, res) => {
   const { content, chatId, content_type } = req.body;
@@ -38,6 +38,7 @@ const sendMessage = asyncHandler(async (req, res) => {
     content: content,
     chat: chatId,
     content_type: content_type,
+    prev_message: ""
   };
 
   try {
@@ -60,7 +61,7 @@ const sendMessage = asyncHandler(async (req, res) => {
 });
 
 //@description     Delete one message
-//@route           DELETE /api/Message
+//@route           DELETE /api/message
 //@access          Protected
 const deleteMessage = asyncHandler(async (req, res) => {
 
@@ -125,10 +126,53 @@ const updateMessage = asyncHandler(async (req, res) => {
     console.log(error.message)
     throw new Error(error.Message);
   }
+})
+
+//@description     Reply to one message
+//@route           PUT /api/message/reply
+//@access          Protected
+const replyMessage = asyncHandler(async (req, res) => {
+  const { chatId, messageId, content, content_type } = req.body;
+
+  if (!messageId || !chatId || !content || !content_type) {
+    return res.status(400).json({ "error": "Provide valid chatId, messageId, content and content_type" })
+  }
+
+  var newMessageModal = {
+    sender: req.user._id,
+    content: content,
+    chat: chatId,
+    content_type: content_type,
+    prev_message: messageId
+  };
+
+  try {
+    var prevMessage = await Message.find({ chat: chatId, _id: messageId })
+
+    var newMessage = await Message.create(newMessageModal);
+
+    newMessage = await newMessage.populate("sender", "name pic").execPopulate();
+    newMessage = await newMessage.populate("chat").execPopulate();
+    newMessage = await User.populate(newMessage, {
+      path: "chat.users",
+      select: "name pic email",
+    });
+
+    await Chat.findByIdAndUpdate(req.body.chatId, { latestMessage: newMessage });
+
+    res.status(200).json({
+      "prevMessage": prevMessage,
+      "newMessage": newMessage,
+    })
 
 
+  } catch (error) {
+    res.status(400).json({ "error": error.message });
+    console.log(error.message)
+    throw new Error(error.Message);
+  }
 })
 
 
 
-module.exports = { allMessages, sendMessage, deleteMessage, updateMessage };
+module.exports = { allMessages, sendMessage, deleteMessage, updateMessage, replyMessage };
