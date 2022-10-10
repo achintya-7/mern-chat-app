@@ -158,7 +158,7 @@ const replyMessage = asyncHandler(async (req, res) => {
       select: "name pic email",
     });
 
-    await Chat.findByIdAndUpdate(req.body.chatId, { latestMessage: newMessage });
+    await Chat.findByIdAndUpdate(chatId, { latestMessage: newMessage });
 
     res.status(200).json({
       "prevMessage": prevMessage,
@@ -174,5 +174,47 @@ const replyMessage = asyncHandler(async (req, res) => {
 })
 
 
+//@description     Forward one message
+//@route           PUT /api/message/forward
+//@access          Protected
+const forwardMessage = asyncHandler(async (req, res) => {
+  const { chatId, messageId, forwardChatId } = req.body;
 
-module.exports = { allMessages, sendMessage, deleteMessage, updateMessage, replyMessage };
+  if (!chatId || !messageId || !forwardChatId) {
+    return res.status(400).json({ "error": "Provide valid chatId, messageId and forwardChatId" })
+  }
+
+  try {
+    const message = await Message.findOne({ chat: chatId, _id: messageId })
+
+    var newMessageModal = {
+      sender: req.user._id,
+      content: message["content"],
+      chat: forwardChatId,
+      content_type: message["content_type"],
+      prev_message: message["prev_message"]
+    };
+
+    var newMessage = await Message.create(newMessageModal);
+
+    newMessage = await newMessage.populate("sender", "name pic").execPopulate();
+    newMessage = await newMessage.populate("chat").execPopulate();
+    newMessage = await User.populate(newMessage, {
+      path: "chat.users",
+      select: "name pic email",
+    });
+
+    await Chat.findByIdAndUpdate(forwardChatId, { latestMessage: newMessage });
+
+    res.status(200).json(newMessage)
+  } catch (error) {
+    res.status(400).json({ "error": error.message });
+    console.log(error.message)
+    throw new Error(error.Message);
+  }
+
+})
+
+
+
+module.exports = { allMessages, sendMessage, deleteMessage, updateMessage, replyMessage, forwardMessage };
