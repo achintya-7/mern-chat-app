@@ -12,7 +12,7 @@ const allMessages = asyncHandler(async (req, res) => {
     const messages = await Message.find({ chat: req.params.chatId })
       .populate("sender", "name pic email")
       .populate("chat");
-    res.json(messages);
+    res.json({"messages": messages});
   } catch (error) {
     res.status(400);
     throw new Error(error.message);
@@ -178,21 +178,20 @@ const replyMessage = asyncHandler(async (req, res) => {
 //@route           PUT /api/message/forward
 //@access          Protected
 const forwardMessage = asyncHandler(async (req, res) => {
-  const { chatId, messageId, forwardChatId } = req.body;
+  const { content, content_type, forwardChatId } = req.body;
 
-  if (!chatId || !messageId || !forwardChatId) {
-    return res.status(400).json({ "error": "Provide valid chatId, messageId and forwardChatId" })
+  if ( !content || !content_type || !forwardChatId ) {
+    return res.status(400).json({ "error": "Provide valid content, content_type and forwardChatId" })
   }
 
   try {
-    const message = await Message.findOne({ chat: chatId, _id: messageId })
 
     var newMessageModal = {
       sender: req.user._id,
-      content: message["content"],
+      content: content,
       chat: forwardChatId,
-      content_type: message["content_type"],
-      prev_message: message["prev_message"]
+      content_type: content_type,
+      prev_message: ""
     };
 
     var newMessage = await Message.create(newMessageModal);
